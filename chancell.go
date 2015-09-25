@@ -12,16 +12,20 @@ const DefaultChanLength = 16
 
 type ChanCell struct {
 	sync.Mutex
-	next  *ChanCell
-	Open  func()
-	Close func()
+	next   *ChanCell
+	opened bool
+	Open   func()
+	Close  func()
 }
 
 func (cell *ChanCell) Next() *ChanCell {
 	cell.Lock()
+	defer cell.Unlock()
 	next := cell.next
-	cell.Unlock()
-	next.Open()
+	if !next.opened {
+		next.opened = true
+		next.Open()
+	}
 	return next
 }
 
@@ -46,6 +50,7 @@ func NewChanCellTail(initFun func(int, *ChanCell)) (*ChanCell, *ChanCellTail) {
 	tail.Lock()
 	tail.initNewChanCell(tail.n, head)
 	tail.Unlock()
+	head.opened = true
 	head.Open()
 	return head, tail
 }
