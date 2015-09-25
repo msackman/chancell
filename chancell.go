@@ -12,21 +12,28 @@ const DefaultChanLength = 16
 
 type ChanCell struct {
 	sync.Mutex
-	next   *ChanCell
-	opened bool
-	Open   func()
-	Close  func()
+	next    *ChanCell
+	drained bool
+	Open    func()
+	Close   func()
 }
 
 func (cell *ChanCell) Next() *ChanCell {
 	cell.Lock()
-	defer cell.Unlock()
 	next := cell.next
-	if !next.opened {
-		next.opened = true
+	if !cell.drained {
+		cell.drained = true
 		next.Open()
 	}
-	return next
+	cell.Unlock()
+	next.Lock()
+	nextDrained := next.drained
+	next.Unlock()
+	if nextDrained {
+		return next.Next()
+	} else {
+		return next
+	}
 }
 
 type CurCellConsumer func(*ChanCell) (bool, CurCellConsumer)
@@ -50,7 +57,6 @@ func NewChanCellTail(initFun func(int, *ChanCell)) (*ChanCell, *ChanCellTail) {
 	tail.Lock()
 	tail.initNewChanCell(tail.n, head)
 	tail.Unlock()
-	head.opened = true
 	head.Open()
 	return head, tail
 }
