@@ -12,28 +12,33 @@ const DefaultChanLength = 16
 
 type ChanCell struct {
 	sync.Mutex
-	next    *ChanCell
-	drained bool
-	Open    func()
-	Close   func()
+	next  *ChanCell
+	Open  func()
+	Close func()
 }
 
-func (cell *ChanCell) Next() *ChanCell {
-	cell.Lock()
-	next := cell.next
-	if !cell.drained {
-		cell.drained = true
+type ChanCellHead struct {
+	sync.RWMutex
+	cell *ChanCell
+}
+
+func (head *ChanCellHead) WithCell(fun func(*ChanCell)) {
+	head.RLock()
+	fun(head.cell)
+	head.RUnlock()
+}
+
+func (head *ChanCellHead) Next(current *ChanCell, fun func(*ChanCell)) {
+	head.Lock()
+	if head.cell == current {
+		current.Lock()
+		next := current.next
+		current.Unlock()
+		head.cell = next
 		next.Open()
 	}
-	cell.Unlock()
-	next.Lock()
-	nextDrained := next.drained
-	next.Unlock()
-	if nextDrained {
-		return next.Next()
-	} else {
-		return next
-	}
+	head.Unlock()
+	head.WithCell(fun)
 }
 
 type CurCellConsumer func(*ChanCell) (bool, CurCellConsumer)
@@ -46,18 +51,21 @@ type ChanCellTail struct {
 	initNewChanCell func(int, *ChanCell)
 }
 
-func NewChanCellTail(initFun func(int, *ChanCell)) (*ChanCell, *ChanCellTail) {
-	head := new(ChanCell)
+func NewChanCellTail(initFun func(int, *ChanCell)) (*ChanCellHead, *ChanCellTail) {
+	current := new(ChanCell)
 	tail := &ChanCellTail{
 		Terminated:      make(chan struct{}),
-		cell:            head,
+		cell:            current,
 		n:               DefaultChanLength,
 		initNewChanCell: initFun,
 	}
 	tail.Lock()
-	tail.initNewChanCell(tail.n, head)
+	tail.initNewChanCell(tail.n, current)
 	tail.Unlock()
-	head.Open()
+	head := &ChanCellHead{cell: current}
+	head.Lock()
+	head.cell.Open()
+	head.Unlock()
 	return head, tail
 }
 
