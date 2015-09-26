@@ -34,7 +34,7 @@ The following is a commented example showing how I write actors in
 Go. Please consider this example to be under the same MIT license as
 the rest of this package.
 
-```Go*/
+```Go
 package myactor
 
 import (
