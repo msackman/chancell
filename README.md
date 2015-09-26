@@ -30,6 +30,10 @@ your actors; this is unavoidable. The implementation is safe for actor
 designs where you have multiple actor-workers reading off the same
 work-queue.
 
+Once the queue has stabilised to the right capacity, the only overhead
+is taking a read-lock on sending. There is no additional overhead on
+receiving.
+
 The following is a commented example showing how I write actors in
 Go. Please consider this example to be under the same MIT license as
 the rest of this package.
